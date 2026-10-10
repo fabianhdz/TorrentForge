@@ -1,0 +1,10 @@
+add_executable(torrentforge_application_test application_test.cpp)
+target_link_libraries(torrentforge_application_test PRIVATE torrentforge_core)
+add_test(NAME application COMMAND torrentforge_application_test)
+
+add_executable(torrentforge_bencode_test bencode_test.cpp)
+target_link_libraries(torrentforge_bencode_test PRIVATE torrentforge_core)
+add_test(NAME bencode_strings COMMAND torrentforge_bencode_test)
+
+add_test(NAME executable_smoke COMMAND torrentforge)
+set_tests_properties(executable_smoke PROPERTIES PASS_REGULAR_EXPRESSION "TorrentForge")
