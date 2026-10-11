@@ -15,6 +15,19 @@ using json = nlohmann::json;
 
 namespace {
 
+json decode_bencoded_string(const std::string& encoded_value) {
+    // Example: "5:hello" -> "hello"
+    size_t colon_index = encoded_value.find(':');
+    if (colon_index != std::string::npos) {
+        std::string number_string = encoded_value.substr(0, colon_index);
+        int64_t number = std::atoll(number_string.c_str());
+        std::string str = encoded_value.substr(colon_index + 1, number);
+        return json(str);
+    }
+
+    throw std::runtime_error("Invalid encoded value: " + encoded_value);
+}
+
 json decode_bencoded_integer(const std::string& encoded_value) {
     if (encoded_value.size() < 3 || encoded_value.front() != 'i' ||
         encoded_value.back() != 'e') {
@@ -52,19 +65,10 @@ json decode_bencoded_value(const std::string& encoded_value) {
     }
 
     if (std::isdigit(static_cast<unsigned char>(encoded_value.front()))) {
-        // Example: "5:hello" -> "hello"
-        size_t colon_index = encoded_value.find(':');
-        if (colon_index != std::string::npos) {
-            std::string number_string = encoded_value.substr(0, colon_index);
-            int64_t number = std::atoll(number_string.c_str());
-            std::string str = encoded_value.substr(colon_index + 1, number);
-            return json(str);
-        } else {
-            throw std::runtime_error("Invalid encoded value: " + encoded_value);
-        }
-    } else {
-        throw std::runtime_error("Unhandled encoded value: " + encoded_value);
+        return decode_bencoded_string(encoded_value);
     }
+
+    throw std::runtime_error("Unhandled encoded value: " + encoded_value);
 }
 
 } // namespace torrentforge
