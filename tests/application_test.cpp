@@ -37,16 +37,21 @@ int main() {
         std::ostringstream decoded;
         std::ostringstream diagnostics;
         const std::array arguments{std::string_view{"decode"}, encoded};
-        check(torrentforge::run(arguments, decoded, diagnostics) == 0, "String decoding should succeed");
-        check(decoded.str() == expected, "Decoded output should be a JSON string followed by a newline");
+        check(torrentforge::run(arguments, decoded, diagnostics) == 0, "Decoding should succeed");
+        check(decoded.str() == expected, "Decoded output should be JSON followed by a newline");
         check(diagnostics.str().empty(), "Successful decoding should not write errors");
     };
     check_decode("5:hello", "\"hello\"\n");
     check_decode("0:", "\"\"\n");
     check_decode("5:a\"b\\c", "\"a\\\"b\\\\c\"\n");
     check_decode("3:a\nb", "\"a\\nb\"\n");
+    check_decode("i0e", "0\n");
+    check_decode("i52e", "52\n");
+    check_decode("i-52e", "-52\n");
+    check_decode("i4294967300e", "4294967300\n");
 
-    for (const auto* encoded : {"", "5hello", "i42e", "1:\xff"}) {
+    for (const auto* encoded : {"", "5hello", "ie", "i01e", "i9223372036854775808e",
+                                "1:\xff"}) {
         std::ostringstream decoded;
         std::ostringstream diagnostics;
         const std::array arguments{std::string_view{"decode"}, std::string_view{encoded}};
