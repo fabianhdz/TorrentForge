@@ -13,7 +13,7 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
         output << "TorrentForge\n"
                   "Usage: torrentforge [--help]\n"
                   "       torrentforge decode <encoded_value>\n"
-                  "Decodes bencoded strings as JSON.\n";
+                  "Decodes bencoded strings and integers as JSON.\n";
         return 0;
     }
 

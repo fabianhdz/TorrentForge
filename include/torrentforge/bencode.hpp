@@ -6,7 +6,7 @@
 
 namespace torrentforge {
 
-// Decodes a bencoded string into a JSON string. Other value types are unsupported.
+// Decodes one complete bencoded string or integer into its JSON representation.
 nlohmann::json decode_bencoded_value(const std::string& encoded_value);
 
 } // namespace torrentforge
