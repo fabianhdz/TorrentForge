@@ -49,9 +49,13 @@ int main() {
     check_decode("i52e", "52\n");
     check_decode("i-52e", "-52\n");
     check_decode("i4294967300e", "4294967300\n");
+    check_decode("le", "[]\n");
+    check_decode("l5:helloi52ee", "[\"hello\",52]\n");
+    check_decode("ll5:helloi52eee", "[[\"hello\",52]]\n");
+    check_decode("lli4eei5ee", "[[4],5]\n");
 
     for (const auto* encoded : {"", "5hello", "ie", "i01e", "i9223372036854775808e",
-                                "1:\xff"}) {
+                                "l", "li1e", "lxe", "1:a1:b", "1:\xff"}) {
         std::ostringstream decoded;
         std::ostringstream diagnostics;
         const std::array arguments{std::string_view{"decode"}, std::string_view{encoded}};

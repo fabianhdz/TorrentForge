@@ -41,8 +41,24 @@ int main() {
         }
     }
 
+    const std::array list_examples{
+        std::pair{std::string{"le"}, std::string{"[]"}},
+        std::pair{std::string{"l5:helloi52ee"}, std::string{"[\"hello\",52]"}},
+        std::pair{std::string{"ll5:helloi52eee"}, std::string{"[[\"hello\",52]]"}},
+        std::pair{std::string{"lli4eei5ee"}, std::string{"[[4],5]"}},
+        std::pair{std::string{"l0:lee"}, std::string{"[\"\",[]]"}},
+    };
+    for (const auto& [encoded, expected] : list_examples) {
+        const auto decoded = torrentforge::decode_bencoded_value(encoded);
+        if (!decoded.is_array() || decoded.dump() != expected) {
+            std::cerr << "Incorrect list decoding for " << encoded << '\n';
+            ++failures;
+        }
+    }
+
     for (const auto* encoded : {"", "5hello", "i", "ie", "i-e", "i52", "i+1e",
-                                "i01e", "i-0e", "i12xe", "i9223372036854775808e"}) {
+                                "i01e", "i-0e", "i12xe", "i9223372036854775808e",
+                                "l", "li1e", "lxe", "lee", "l3:abe", "1:a1:b"}) {
         try {
             torrentforge::decode_bencoded_value(encoded);
             std::cerr << "Expected a decoding error for " << encoded << '\n';
