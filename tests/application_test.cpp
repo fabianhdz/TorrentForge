@@ -1,6 +1,9 @@
 #include "torrentforge/application.hpp"
 
 #include <array>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -80,6 +83,41 @@ int main() {
     check(torrentforge::run(extra_value, output, errors) == 1, "Decode should reject extra arguments");
     check(output.str().empty(), "Extra arguments should not produce normal output");
     check(!errors.str().empty(), "Extra arguments should produce a diagnostic");
+
+    const std::string tracker = "http://tracker.example/announce";
+    const std::string torrent = "d8:announce" + std::to_string(tracker.size()) + ':' + tracker +
+                                "4:infod6:lengthi92063eee";
+    const auto unique_suffix = std::chrono::steady_clock::now().time_since_epoch().count();
+    const std::filesystem::path torrent_path =
+        std::filesystem::temp_directory_path() /
+        ("torrentforge-application-" + std::to_string(unique_suffix) + ".torrent");
+    {
+        std::ofstream torrent_file{torrent_path, std::ios::binary};
+        torrent_file.write(torrent.data(), static_cast<std::streamsize>(torrent.size()));
+    }
+
+    output.str("");
+    errors.str("");
+    const std::string torrent_path_text = torrent_path.string();
+    const std::array info_arguments{std::string_view{"info"},
+                                    std::string_view{torrent_path_text}};
+    check(torrentforge::run(info_arguments, output, errors) == 0,
+          "Reading torrent metadata should succeed");
+    check(output.str() == "Tracker URL: http://tracker.example/announce\nLength: 92063\n",
+          "Torrent metadata should use the documented output format");
+    check(errors.str().empty(), "Reading valid torrent metadata should not write errors");
+
+    std::error_code ignored;
+    std::filesystem::remove(torrent_path, ignored);
+
+    output.str("");
+    errors.str("");
+    const std::array missing_info_argument{std::string_view{"info"}};
+    check(torrentforge::run(missing_info_argument, output, errors) == 1,
+          "Info requires a torrent file path");
+    check(output.str().empty(), "A missing torrent path should not produce normal output");
+    check(errors.str().find("Usage:") != std::string::npos,
+          "A missing torrent path should explain usage");
 
     return failures == 0 ? 0 : 1;
 }
