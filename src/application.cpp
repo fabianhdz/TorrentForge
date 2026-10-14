@@ -1,7 +1,9 @@
 #include "torrentforge/application.hpp"
 #include "torrentforge/bencode.hpp"
+#include "torrentforge/torrent.hpp"
 
 #include <exception>
+#include <filesystem>
 #include <ostream>
 #include <string>
 
@@ -13,7 +15,8 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
         output << "TorrentForge\n"
                   "Usage: torrentforge [--help]\n"
                   "       torrentforge decode <encoded_value>\n"
-                  "Decodes supported bencoded values as JSON.\n";
+                  "       torrentforge info <torrent_file>\n"
+                  "Decodes bencoded values and reads torrent metadata.\n";
         return 0;
     }
 
@@ -25,6 +28,23 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
         try {
             const auto decoded_value = decode_bencoded_value(std::string{arguments[1]});
             output << decoded_value.dump() << '\n';
+            return 0;
+        } catch (const std::exception& error) {
+            errors << "TorrentForge: " << error.what() << '\n';
+            return 1;
+        }
+    }
+
+    if (arguments.front() == "info") {
+        if (arguments.size() != 2) {
+            errors << "Usage: torrentforge info <torrent_file>\n";
+            return 1;
+        }
+        try {
+            const auto metadata =
+                load_torrent_metadata(std::filesystem::path{std::string{arguments[1]}});
+            output << "Tracker URL: " << metadata.tracker_url << '\n'
+                   << "Length: " << metadata.length << '\n';
             return 0;
         } catch (const std::exception& error) {
             errors << "TorrentForge: " << error.what() << '\n';
