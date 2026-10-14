@@ -92,6 +92,39 @@ json decode_bencoded_list(std::string_view& remaining) {
     }
 }
 
+json decode_bencoded_dictionary(std::string_view& remaining) {
+    remaining.remove_prefix(1);
+    json decoded = json::object();
+    std::string previous_key;
+    bool has_previous_key = false;
+
+    while (true) {
+        if (remaining.empty()) {
+            throw std::runtime_error("Bencoded dictionary is missing its terminator");
+        }
+        if (remaining.front() == 'e') {
+            remaining.remove_prefix(1);
+            return decoded;
+        }
+        if (!std::isdigit(static_cast<unsigned char>(remaining.front()))) {
+            throw std::runtime_error("Bencoded dictionary keys must be strings");
+        }
+
+        const std::string key = decode_bencoded_string(remaining).get<std::string>();
+        if (has_previous_key && key <= previous_key) {
+            throw std::runtime_error(
+                "Bencoded dictionary keys must be unique and lexicographically sorted");
+        }
+        if (remaining.empty() || remaining.front() == 'e') {
+            throw std::runtime_error("Bencoded dictionary key is missing its value");
+        }
+
+        decoded.emplace(key, decode_next_value(remaining));
+        previous_key = key;
+        has_previous_key = true;
+    }
+}
+
 json decode_next_value(std::string_view& remaining) {
     if (remaining.empty()) {
         throw std::runtime_error("Cannot decode an empty value");
@@ -103,6 +136,9 @@ json decode_next_value(std::string_view& remaining) {
     }
     if (prefix == 'l') {
         return decode_bencoded_list(remaining);
+    }
+    if (prefix == 'd') {
+        return decode_bencoded_dictionary(remaining);
     }
     if (std::isdigit(static_cast<unsigned char>(prefix))) {
         return decode_bencoded_string(remaining);
