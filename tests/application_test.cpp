@@ -53,9 +53,13 @@ int main() {
     check_decode("l5:helloi52ee", "[\"hello\",52]\n");
     check_decode("ll5:helloi52eee", "[[\"hello\",52]]\n");
     check_decode("lli4eei5ee", "[[4],5]\n");
+    check_decode("de", "{}\n");
+    check_decode("d3:foo3:bar5:helloi52ee", "{\"foo\":\"bar\",\"hello\":52}\n");
+    check_decode("d5:innerd1:ai1e1:bleee", "{\"inner\":{\"a\":1,\"b\":[]}}\n");
 
     for (const auto* encoded : {"", "5hello", "ie", "i01e", "i9223372036854775808e",
-                                "l", "li1e", "lxe", "1:a1:b", "1:\xff"}) {
+                                "l", "li1e", "lxe", "d", "d3:fooe", "d1:bi1e1:ai2ee",
+                                "1:a1:b", "1:\xff"}) {
         std::ostringstream decoded;
         std::ostringstream diagnostics;
         const std::array arguments{std::string_view{"decode"}, std::string_view{encoded}};

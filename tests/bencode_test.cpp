@@ -56,9 +56,29 @@ int main() {
         }
     }
 
+    const std::array dictionary_examples{
+        std::pair{std::string{"de"}, std::string{"{}"}},
+        std::pair{std::string{"d3:foo3:bar5:helloi52ee"},
+                  std::string{"{\"foo\":\"bar\",\"hello\":52}"}},
+        std::pair{std::string{"d4:listl5:helloi52eee"},
+                  std::string{"{\"list\":[\"hello\",52]}"}},
+        std::pair{std::string{"d5:innerd1:ai1e1:bleee"},
+                  std::string{"{\"inner\":{\"a\":1,\"b\":[]}}"}},
+        std::pair{std::string{"ld1:ai1eee"}, std::string{"[{\"a\":1}]"}},
+    };
+    for (const auto& [encoded, expected] : dictionary_examples) {
+        const auto decoded = torrentforge::decode_bencoded_value(encoded);
+        if (!decoded.is_structured() || decoded.dump() != expected) {
+            std::cerr << "Incorrect dictionary decoding for " << encoded << '\n';
+            ++failures;
+        }
+    }
+
     for (const auto* encoded : {"", "5hello", "i", "ie", "i-e", "i52", "i+1e",
                                 "i01e", "i-0e", "i12xe", "i9223372036854775808e",
-                                "l", "li1e", "lxe", "lee", "l3:abe", "1:a1:b"}) {
+                                "l", "li1e", "lxe", "lee", "l3:abe", "1:a1:b",
+                                "d", "di1e3:fooe", "d3:fooe", "d1:bi1e1:ai2ee",
+                                "d1:ai1e1:ai2ee"}) {
         try {
             torrentforge::decode_bencoded_value(encoded);
             std::cerr << "Expected a decoding error for " << encoded << '\n';
