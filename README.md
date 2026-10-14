@@ -21,6 +21,8 @@ cmake --build build
 ```sh
 ./build/torrentforge
 ./build/torrentforge --help
+./build/torrentforge decode 'l5:helloi52ee'
+./build/torrentforge info path/to/file.torrent
 ```
 
 ## Test

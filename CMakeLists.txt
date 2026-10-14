@@ -20,7 +20,11 @@ if(TORRENTFORGE_ENABLE_SANITIZERS)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
-add_library(torrentforge_core STATIC src/application.cpp src/bencode.cpp)
+add_library(torrentforge_core STATIC
+    src/application.cpp
+    src/bencode.cpp
+    src/torrent.cpp
+)
 target_include_directories(torrentforge_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(torrentforge_core SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 target_compile_features(torrentforge_core PUBLIC cxx_std_23)
