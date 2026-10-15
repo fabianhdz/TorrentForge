@@ -10,5 +10,9 @@ add_executable(torrentforge_torrent_test torrent_test.cpp)
 target_link_libraries(torrentforge_torrent_test PRIVATE torrentforge_core)
 add_test(NAME torrent_metadata COMMAND torrentforge_torrent_test)
 
+add_executable(torrentforge_hash_test hash_test.cpp)
+target_link_libraries(torrentforge_hash_test PRIVATE torrentforge_core)
+add_test(NAME hash COMMAND torrentforge_hash_test)
+
 add_test(NAME executable_smoke COMMAND torrentforge)
 set_tests_properties(executable_smoke PROPERTIES PASS_REGULAR_EXPRESSION "TorrentForge")

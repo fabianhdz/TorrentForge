@@ -103,7 +103,8 @@ int main() {
                                     std::string_view{torrent_path_text}};
     check(torrentforge::run(info_arguments, output, errors) == 0,
           "Reading torrent metadata should succeed");
-    check(output.str() == "Tracker URL: http://tracker.example/announce\nLength: 92063\n",
+    check(output.str() == "Tracker URL: http://tracker.example/announce\nLength: 92063\n"
+                          "Info Hash: 6c0ef2157656ae55b2e1d65fddbc0de1e3445ee1\n",
           "Torrent metadata should use the documented output format");
     check(errors.str().empty(), "Reading valid torrent metadata should not write errors");
 

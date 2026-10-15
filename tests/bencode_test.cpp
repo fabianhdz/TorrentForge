@@ -23,6 +23,10 @@ int main() {
             std::cerr << "Incorrect string decoding for " << encoded << '\n';
             ++failures;
         }
+        if (torrentforge::encode_bencoded_value(decoded) != encoded) {
+            std::cerr << "Incorrect string encoding for " << encoded << '\n';
+            ++failures;
+        }
     }
 
     const std::array integer_examples{
@@ -39,6 +43,10 @@ int main() {
             std::cerr << "Incorrect integer decoding for " << encoded << '\n';
             ++failures;
         }
+        if (torrentforge::encode_bencoded_value(decoded) != encoded) {
+            std::cerr << "Incorrect integer encoding for " << encoded << '\n';
+            ++failures;
+        }
     }
 
     const std::array list_examples{
@@ -52,6 +60,10 @@ int main() {
         const auto decoded = torrentforge::decode_bencoded_value(encoded);
         if (!decoded.is_array() || decoded.dump() != expected) {
             std::cerr << "Incorrect list decoding for " << encoded << '\n';
+            ++failures;
+        }
+        if (torrentforge::encode_bencoded_value(decoded) != encoded) {
+            std::cerr << "Incorrect list encoding for " << encoded << '\n';
             ++failures;
         }
     }
@@ -70,6 +82,10 @@ int main() {
         const auto decoded = torrentforge::decode_bencoded_value(encoded);
         if (!decoded.is_structured() || decoded.dump() != expected) {
             std::cerr << "Incorrect dictionary decoding for " << encoded << '\n';
+            ++failures;
+        }
+        if (torrentforge::encode_bencoded_value(decoded) != encoded) {
+            std::cerr << "Incorrect dictionary encoding for " << encoded << '\n';
             ++failures;
         }
     }

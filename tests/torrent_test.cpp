@@ -52,6 +52,9 @@ int main() {
     check(parsed.tracker_url == "http://tracker.example/announce",
           "The announce URL should be read from the root dictionary");
     check(parsed.length == 92063, "The file length should be read from the info dictionary");
+    check(torrentforge::to_hex(parsed.info_hash) ==
+              "dc68106bd79e0aaed6549b092ba775d5a75c0d33",
+          "The info hash should cover the complete bencoded info dictionary");
 
     const auto unique_suffix = std::chrono::steady_clock::now().time_since_epoch().count();
     TemporaryFile temporary{
@@ -64,7 +67,8 @@ int main() {
     }
 
     const auto loaded = torrentforge::load_torrent_metadata(temporary.path);
-    check(loaded.tracker_url == parsed.tracker_url && loaded.length == parsed.length,
+    check(loaded.tracker_url == parsed.tracker_url && loaded.length == parsed.length &&
+              loaded.info_hash == parsed.info_hash,
           "Loading a torrent file should preserve its parsed metadata");
 
     const auto expect_error = [&check](const std::string& malformed) {
