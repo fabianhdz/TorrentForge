@@ -1,6 +1,7 @@
 #include "torrentforge/torrent.hpp"
 
 #include "torrentforge/bencode.hpp"
+#include "torrentforge/hash.hpp"
 
 #include <fstream>
 #include <iterator>
@@ -50,6 +51,7 @@ TorrentMetadata parse_torrent_metadata(const std::string& encoded_torrent) {
     return TorrentMetadata{
         .tracker_url = announce.get<std::string>(),
         .length = file_length,
+        .info_hash = sha1(encode_bencoded_value(info)),
     };
 }
 

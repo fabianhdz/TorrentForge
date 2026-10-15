@@ -8,6 +8,7 @@ torrent metadata, peer-to-peer networking, and piece-based file transfers.
 - GCC 13 or newer
 - CMake 3.20 or newer
 - Make or Ninja
+- OpenSSL development headers and libraries
 
 ## Build
 

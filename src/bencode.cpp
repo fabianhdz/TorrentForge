@@ -18,6 +18,55 @@ namespace {
 
 json decode_next_value(std::string_view& remaining);
 
+void append_bencoded_string(std::string_view text, std::string& encoded) {
+    encoded += std::to_string(text.size());
+    encoded += ':';
+    encoded += text;
+}
+
+void append_bencoded_value(const json& value, std::string& encoded) {
+    if (value.is_string()) {
+        const auto& text = value.get_ref<const json::string_t&>();
+        append_bencoded_string(text, encoded);
+        return;
+    }
+
+    if (value.is_number_unsigned()) {
+        encoded += 'i';
+        encoded += std::to_string(value.get<std::uint64_t>());
+        encoded += 'e';
+        return;
+    }
+
+    if (value.is_number_integer()) {
+        encoded += 'i';
+        encoded += std::to_string(value.get<std::int64_t>());
+        encoded += 'e';
+        return;
+    }
+
+    if (value.is_array()) {
+        encoded += 'l';
+        for (const auto& element : value) {
+            append_bencoded_value(element, encoded);
+        }
+        encoded += 'e';
+        return;
+    }
+
+    if (value.is_object()) {
+        encoded += 'd';
+        for (auto member = value.cbegin(); member != value.cend(); ++member) {
+            append_bencoded_string(member.key(), encoded);
+            append_bencoded_value(member.value(), encoded);
+        }
+        encoded += 'e';
+        return;
+    }
+
+    throw std::runtime_error("JSON value cannot be represented as bencode");
+}
+
 json decode_bencoded_string(std::string_view& remaining) {
     const std::size_t colon = remaining.find(':');
     if (colon == std::string_view::npos) {
@@ -156,6 +205,12 @@ json decode_bencoded_value(const std::string& encoded_value) {
         throw std::runtime_error("Unexpected data after bencoded value");
     }
     return decoded;
+}
+
+std::string encode_bencoded_value(const json& value) {
+    std::string encoded;
+    append_bencoded_value(value, encoded);
+    return encoded;
 }
 
 } // namespace torrentforge

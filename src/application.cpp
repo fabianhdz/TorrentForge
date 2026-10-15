@@ -1,5 +1,6 @@
 #include "torrentforge/application.hpp"
 #include "torrentforge/bencode.hpp"
+#include "torrentforge/hash.hpp"
 #include "torrentforge/torrent.hpp"
 
 #include <exception>
@@ -44,7 +45,8 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
             const auto metadata =
                 load_torrent_metadata(std::filesystem::path{std::string{arguments[1]}});
             output << "Tracker URL: " << metadata.tracker_url << '\n'
-                   << "Length: " << metadata.length << '\n';
+                   << "Length: " << metadata.length << '\n'
+                   << "Info Hash: " << to_hex(metadata.info_hash) << '\n';
             return 0;
         } catch (const std::exception& error) {
             errors << "TorrentForge: " << error.what() << '\n';
