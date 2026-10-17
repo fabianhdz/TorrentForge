@@ -85,8 +85,10 @@ int main() {
     check(!errors.str().empty(), "Extra arguments should produce a diagnostic");
 
     const std::string tracker = "http://tracker.example/announce";
+    const std::string piece_hash(20, '\0');
     const std::string torrent = "d8:announce" + std::to_string(tracker.size()) + ':' + tracker +
-                                "4:infod6:lengthi92063eee";
+                                "4:infod6:lengthi1e12:piece lengthi1e6:pieces20:" +
+                                piece_hash + "ee";
     const auto unique_suffix = std::chrono::steady_clock::now().time_since_epoch().count();
     const std::filesystem::path torrent_path =
         std::filesystem::temp_directory_path() /
@@ -103,8 +105,10 @@ int main() {
                                     std::string_view{torrent_path_text}};
     check(torrentforge::run(info_arguments, output, errors) == 0,
           "Reading torrent metadata should succeed");
-    check(output.str() == "Tracker URL: http://tracker.example/announce\nLength: 92063\n"
-                          "Info Hash: 6c0ef2157656ae55b2e1d65fddbc0de1e3445ee1\n",
+    check(output.str() == "Tracker URL: http://tracker.example/announce\nLength: 1\n"
+                          "Info Hash: 3c09990d10cd19eaa73ca061aab57053dcef5938\n"
+                          "Piece Length: 1\nPiece Hashes:\n"
+                          "0000000000000000000000000000000000000000\n",
           "Torrent metadata should use the documented output format");
     check(errors.str().empty(), "Reading valid torrent metadata should not write errors");
 
