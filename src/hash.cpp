@@ -26,8 +26,8 @@ std::string to_hex(const Sha1Digest& digest) {
     std::string result(digest.size() * 2, '0');
 
     for (std::size_t index = 0; index < digest.size(); ++index) {
-        result[index * 2] = digits[digest[index] >> 4];
-        result[index * 2 + 1] = digits[digest[index] & 0x0f];
+        result[index * 2] = digits[digest[index] >> 4];         // Upper four bits
+        result[index * 2 + 1] = digits[digest[index] & 0x0f];   // Lower four bits
     }
 
     return result;

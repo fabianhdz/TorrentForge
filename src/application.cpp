@@ -46,7 +46,12 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
                 load_torrent_metadata(std::filesystem::path{std::string{arguments[1]}});
             output << "Tracker URL: " << metadata.tracker_url << '\n'
                    << "Length: " << metadata.length << '\n'
-                   << "Info Hash: " << to_hex(metadata.info_hash) << '\n';
+                   << "Info Hash: " << to_hex(metadata.info_hash) << '\n'
+                   << "Piece Length: " << metadata.piece_length << '\n'
+                   << "Piece Hashes:\n";
+            for (const auto& piece_hash : metadata.piece_hashes) {
+                output << to_hex(piece_hash) << '\n';
+            }
             return 0;
         } catch (const std::exception& error) {
             errors << "TorrentForge: " << error.what() << '\n';

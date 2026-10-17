@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace torrentforge {
 
@@ -12,6 +13,8 @@ struct TorrentMetadata {
     std::string tracker_url;
     std::int64_t length;
     Sha1Digest info_hash;
+    std::int64_t piece_length;
+    std::vector<Sha1Digest> piece_hashes;
 };
 
 TorrentMetadata parse_torrent_metadata(const std::string& encoded_torrent);
