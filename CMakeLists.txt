@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(TorrentForge VERSION 0.1.0 LANGUAGES CXX)
 
 find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+find_package(CURL 7.85 REQUIRED)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,12 +27,13 @@ add_library(torrentforge_core STATIC
     src/application.cpp
     src/bencode.cpp
     src/hash.cpp
+    src/tracker.cpp
     src/torrent.cpp
 )
 target_include_directories(torrentforge_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_include_directories(torrentforge_core SYSTEM PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 target_compile_features(torrentforge_core PUBLIC cxx_std_23)
-target_link_libraries(torrentforge_core PRIVATE OpenSSL::Crypto)
+target_link_libraries(torrentforge_core PRIVATE OpenSSL::Crypto CURL::libcurl)
 
 add_executable(torrentforge src/main.cpp)
 target_link_libraries(torrentforge PRIVATE torrentforge_core)

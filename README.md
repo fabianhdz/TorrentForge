@@ -9,6 +9,7 @@ torrent metadata, peer-to-peer networking, and piece-based file transfers.
 - CMake 3.20 or newer
 - Make or Ninja
 - OpenSSL development headers and libraries
+- libcurl 7.85 or newer, including development headers
 
 ## Build
 
@@ -24,6 +25,7 @@ cmake --build build
 ./build/torrentforge --help
 ./build/torrentforge decode 'l5:helloi52ee'
 ./build/torrentforge info path/to/file.torrent
+./build/torrentforge peers path/to/file.torrent
 ```
 
 ## Test
