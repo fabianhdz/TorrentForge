@@ -124,5 +124,14 @@ int main() {
     check(errors.str().find("Usage:") != std::string::npos,
           "A missing torrent path should explain usage");
 
+    output.str("");
+    errors.str("");
+    const std::array missing_peers_argument{std::string_view{"peers"}};
+    check(torrentforge::run(missing_peers_argument, output, errors) == 1,
+          "Peers requires a torrent file path");
+    check(output.str().empty(), "A missing peers path should not produce normal output");
+    check(errors.str().find("Usage:") != std::string::npos,
+          "A missing peers path should explain usage");
+
     return failures == 0 ? 0 : 1;
 }
