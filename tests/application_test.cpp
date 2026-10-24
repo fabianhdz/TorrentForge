@@ -133,5 +133,14 @@ int main() {
     check(errors.str().find("Usage:") != std::string::npos,
           "A missing peers path should explain usage");
 
+    output.str("");
+    errors.str("");
+    const std::array missing_handshake_arguments{std::string_view{"handshake"}};
+    check(torrentforge::run(missing_handshake_arguments, output, errors) == 1,
+          "Handshake requires a torrent path and peer endpoint");
+    check(output.str().empty(), "Missing handshake arguments should not produce normal output");
+    check(errors.str().find("Usage:") != std::string::npos,
+          "Missing handshake arguments should explain usage");
+
     return failures == 0 ? 0 : 1;
 }

@@ -18,5 +18,9 @@ add_executable(torrentforge_tracker_test tracker_test.cpp)
 target_link_libraries(torrentforge_tracker_test PRIVATE torrentforge_core)
 add_test(NAME tracker COMMAND torrentforge_tracker_test)
 
+add_executable(torrentforge_peer_test peer_test.cpp)
+target_link_libraries(torrentforge_peer_test PRIVATE torrentforge_core)
+add_test(NAME peer_protocol COMMAND torrentforge_peer_test)
+
 add_test(NAME executable_smoke COMMAND torrentforge)
 set_tests_properties(executable_smoke PROPERTIES PASS_REGULAR_EXPRESSION "TorrentForge")
