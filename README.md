@@ -26,6 +26,7 @@ cmake --build build
 ./build/torrentforge decode 'l5:helloi52ee'
 ./build/torrentforge info path/to/file.torrent
 ./build/torrentforge peers path/to/file.torrent
+./build/torrentforge handshake path/to/file.torrent 203.0.113.10:6881
 ```
 
 ## Test

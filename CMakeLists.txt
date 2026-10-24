@@ -27,6 +27,8 @@ add_library(torrentforge_core STATIC
     src/application.cpp
     src/bencode.cpp
     src/hash.cpp
+    src/peer.cpp
+    src/peer_id.cpp
     src/tracker.cpp
     src/torrent.cpp
 )
