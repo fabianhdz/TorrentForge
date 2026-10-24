@@ -1,5 +1,6 @@
 #pragma once
 
+#include "torrentforge/peer_id.hpp"
 #include "torrentforge/torrent.hpp"
 
 #include <array>
@@ -9,8 +10,6 @@
 
 namespace torrentforge {
 
-using PeerId = std::array<unsigned char, 20>;
-
 struct PeerEndpoint {
     std::array<std::uint8_t, 4> address;
     std::uint16_t port;
@@ -18,7 +17,6 @@ struct PeerEndpoint {
     bool operator==(const PeerEndpoint&) const = default;
 };
 
-PeerId generate_peer_id();
 std::string build_tracker_url(const TorrentMetadata& metadata, const PeerId& peer_id);
 std::vector<PeerEndpoint> parse_tracker_response(const std::string& encoded_response);
 std::vector<PeerEndpoint> discover_peers(const TorrentMetadata& metadata,

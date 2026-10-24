@@ -4,14 +4,12 @@
 
 #include <curl/curl.h>
 
-#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <random>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -148,22 +146,6 @@ std::string request_tracker(std::string_view url) {
 }
 
 } // namespace
-
-PeerId generate_peer_id() {
-    constexpr std::string_view prefix = "-TF0001-";
-    constexpr std::string_view alphabet =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-
-    PeerId peer_id{};
-    std::copy(prefix.begin(), prefix.end(), peer_id.begin());
-
-    std::random_device random_source;
-    std::uniform_int_distribution<std::size_t> choose(0, alphabet.size() - 1);
-    for (std::size_t index = prefix.size(); index < peer_id.size(); ++index) {
-        peer_id[index] = static_cast<unsigned char>(alphabet[choose(random_source)]);
-    }
-    return peer_id;
-}
 
 std::string build_tracker_url(const TorrentMetadata& metadata, const PeerId& peer_id) {
     std::string url = metadata.tracker_url;
