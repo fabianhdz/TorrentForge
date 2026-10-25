@@ -58,7 +58,7 @@ int main() {
         packed_peers += static_cast<char>(byte);
     }
     const std::string response =
-        "d8:intervali60e5:peers" + bencoded_string(packed_peers) + "e";
+        "d5:peers" + bencoded_string(packed_peers) + "8:intervali60ee";
     const auto peers = torrentforge::parse_tracker_response(response);
     check(peers.size() == 2, "Every compact six-byte peer should be parsed");
     check(torrentforge::to_string(peers[0]) == "165.232.41.73:51556",

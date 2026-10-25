@@ -102,5 +102,21 @@ int main() {
         } catch (const std::runtime_error&) {
         }
     }
+
+    const auto unordered_dictionary = torrentforge::decode_bencoded_value(
+        "d1:bi1e1:ai2ee",
+        torrentforge::BencodeDecodeOptions{.require_sorted_dictionary_keys = false});
+    if (unordered_dictionary.dump() != "{\"a\":2,\"b\":1}") {
+        std::cerr << "Permissive dictionary decoding should retain unordered fields\n";
+        ++failures;
+    }
+    try {
+        static_cast<void>(torrentforge::decode_bencoded_value(
+            "d1:ai1e1:ai2ee",
+            torrentforge::BencodeDecodeOptions{.require_sorted_dictionary_keys = false}));
+        std::cerr << "Permissive dictionary decoding should still reject duplicate keys\n";
+        ++failures;
+    } catch (const std::runtime_error&) {
+    }
     return failures == 0 ? 0 : 1;
 }

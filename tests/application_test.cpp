@@ -142,5 +142,14 @@ int main() {
     check(errors.str().find("Usage:") != std::string::npos,
           "Missing handshake arguments should explain usage");
 
+    output.str("");
+    errors.str("");
+    const std::array missing_download_arguments{std::string_view{"download_piece"}};
+    check(torrentforge::run(missing_download_arguments, output, errors) == 1,
+          "Download piece requires output, torrent, and index arguments");
+    check(output.str().empty(), "Missing download arguments should not produce normal output");
+    check(errors.str().find("Usage:") != std::string::npos,
+          "Missing download arguments should explain usage");
+
     return failures == 0 ? 0 : 1;
 }
