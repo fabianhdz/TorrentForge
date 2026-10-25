@@ -27,6 +27,7 @@ cmake --build build
 ./build/torrentforge info path/to/file.torrent
 ./build/torrentforge peers path/to/file.torrent
 ./build/torrentforge handshake path/to/file.torrent 203.0.113.10:6881
+./build/torrentforge download_piece -o piece.bin path/to/file.torrent 0
 ```
 
 ## Test

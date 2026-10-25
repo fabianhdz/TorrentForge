@@ -1,14 +1,18 @@
 #include "torrentforge/application.hpp"
 #include "torrentforge/bencode.hpp"
+#include "torrentforge/download.hpp"
 #include "torrentforge/hash.hpp"
 #include "torrentforge/peer.hpp"
 #include "torrentforge/peer_id.hpp"
 #include "torrentforge/tracker.hpp"
 #include "torrentforge/torrent.hpp"
 
+#include <charconv>
+#include <cstddef>
 #include <exception>
 #include <filesystem>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 
 namespace torrentforge {
@@ -22,7 +26,8 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
                   "       torrentforge info <torrent_file>\n"
                   "       torrentforge peers <torrent_file>\n"
                   "       torrentforge handshake <torrent_file> <peer>\n"
-                  "Decodes metadata, discovers peers, and speaks the peer protocol.\n";
+                  "       torrentforge download_piece -o <output> <torrent_file> <index>\n"
+                  "Reads torrent metadata and communicates with trackers and peers.\n";
         return 0;
     }
 
@@ -99,6 +104,33 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
             const PeerHandshake remote_handshake =
                 exchange_peer_handshake(arguments[2], local_handshake);
             output << "Peer ID: " << to_hex(remote_handshake.peer_id) << '\n';
+            return 0;
+        } catch (const std::exception& error) {
+            errors << "TorrentForge: " << error.what() << '\n';
+            return 1;
+        }
+    }
+
+    if (arguments.front() == "download_piece") {
+        if (arguments.size() != 5 || arguments[1] != "-o") {
+            errors << "Usage: torrentforge download_piece -o <output> <torrent_file> <index>\n";
+            return 1;
+        }
+        try {
+            std::size_t piece_index = 0;
+            const std::string_view index_text = arguments[4];
+            const auto [end, parse_error] = std::from_chars(
+                index_text.data(), index_text.data() + index_text.size(), piece_index);
+            if (index_text.empty() || parse_error != std::errc{} ||
+                end != index_text.data() + index_text.size()) {
+                throw std::runtime_error("Piece index must be a nonnegative integer");
+            }
+
+            const auto metadata =
+                load_torrent_metadata(std::filesystem::path{std::string{arguments[3]}});
+            const auto piece = download_piece(metadata, piece_index, generate_peer_id());
+            write_piece_file(std::filesystem::path{std::string{arguments[2]}}, piece);
+            output << "Piece " << piece_index << " downloaded to " << arguments[2] << ".\n";
             return 0;
         } catch (const std::exception& error) {
             errors << "TorrentForge: " << error.what() << '\n';

@@ -15,12 +15,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <thread>
 #include <utility>
+#include <vector>
 
 namespace torrentforge {
 
@@ -28,6 +30,8 @@ namespace {
 
 constexpr std::string_view protocol_name = "BitTorrent protocol";
 constexpr auto socket_timeout = std::chrono::seconds{10};
+constexpr auto message_timeout = std::chrono::seconds{30};
+constexpr std::uint32_t maximum_peer_message_size = 4 * 1024 * 1024;
 
 class Socket {
 public:
@@ -56,6 +60,10 @@ public:
 
     [[nodiscard]] int get() const {
         return descriptor_;
+    }
+
+    [[nodiscard]] int release() {
+        return std::exchange(descriptor_, -1);
     }
 
 private:
@@ -200,6 +208,34 @@ Socket connect_to_peer(std::string_view endpoint) {
     throw std::system_error(last_error, std::generic_category(), "Unable to connect to peer");
 }
 
+Socket connect_with_retries(std::string_view endpoint) {
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        try {
+            return connect_to_peer(endpoint);
+        } catch (const std::system_error& error) {
+            if (error.code().value() != ECONNREFUSED || attempt == 2) {
+                throw;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        }
+    }
+    throw std::runtime_error("Unable to connect to peer");
+}
+
+std::uint32_t read_uint32(std::span<const unsigned char> bytes, std::size_t offset) {
+    return (static_cast<std::uint32_t>(bytes[offset]) << 24) |
+           (static_cast<std::uint32_t>(bytes[offset + 1]) << 16) |
+           (static_cast<std::uint32_t>(bytes[offset + 2]) << 8) |
+           static_cast<std::uint32_t>(bytes[offset + 3]);
+}
+
+void append_uint32(std::vector<unsigned char>& bytes, std::uint32_t value) {
+    bytes.push_back(static_cast<unsigned char>(value >> 24));
+    bytes.push_back(static_cast<unsigned char>(value >> 16));
+    bytes.push_back(static_cast<unsigned char>(value >> 8));
+    bytes.push_back(static_cast<unsigned char>(value));
+}
+
 void send_all(int descriptor, std::span<const unsigned char> bytes, Deadline deadline) {
     std::size_t offset = 0;
     while (offset < bytes.size()) {
@@ -217,7 +253,7 @@ void send_all(int descriptor, std::span<const unsigned char> bytes, Deadline dea
             continue;
         }
         throw std::system_error(count == 0 ? EPIPE : errno, std::generic_category(),
-                                "Unable to send peer handshake");
+                                "Unable to send peer data");
     }
 }
 
@@ -237,10 +273,10 @@ void receive_all(int descriptor, std::span<unsigned char> bytes, Deadline deadli
             continue;
         }
         if (count == 0) {
-            throw std::runtime_error("Peer closed before completing its handshake");
+            throw std::runtime_error("Peer closed the connection unexpectedly");
         }
         throw std::system_error(errno, std::generic_category(),
-                                "Unable to receive peer handshake");
+                                "Unable to receive peer data");
     }
 }
 
@@ -276,28 +312,107 @@ PeerHandshake parse_peer_handshake(std::span<const unsigned char> message,
     return handshake;
 }
 
-PeerHandshake exchange_peer_handshake(std::string_view endpoint,
-                                      const PeerHandshake& local_handshake) {
-    Socket connection;
-    for (int attempt = 0; attempt < 3; ++attempt) {
-        try {
-            connection = connect_to_peer(endpoint);
-            break;
-        } catch (const std::system_error& error) {
-            if (error.code().value() != ECONNREFUSED || attempt == 2) {
-                throw;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds{50});
-        }
+std::vector<unsigned char> serialize_peer_message(const PeerMessage& message) {
+    if (!message.id.has_value() && !message.payload.empty()) {
+        throw std::runtime_error("A keep-alive peer message cannot contain a payload");
     }
 
+    if (message.id.has_value() && message.payload.size() >= maximum_peer_message_size) {
+        throw std::runtime_error("Peer message exceeds the maximum supported size");
+    }
+    const std::size_t body_size = message.id.has_value() ? message.payload.size() + 1 : 0;
+
+    std::vector<unsigned char> encoded;
+    encoded.reserve(4 + body_size);
+    append_uint32(encoded, static_cast<std::uint32_t>(body_size));
+    if (message.id.has_value()) {
+        encoded.push_back(static_cast<unsigned char>(*message.id));
+        encoded.insert(encoded.end(), message.payload.begin(), message.payload.end());
+    }
+    return encoded;
+}
+
+PeerMessage parse_peer_message(std::span<const unsigned char> message) {
+    if (message.size() < 4) {
+        throw std::runtime_error("Peer message is missing its length prefix");
+    }
+
+    const std::uint32_t body_size = read_uint32(message, 0);
+    if (body_size > maximum_peer_message_size) {
+        throw std::runtime_error("Peer message exceeds the maximum supported size");
+    }
+    if (message.size() - 4 != body_size) {
+        throw std::runtime_error("Peer message length does not match its payload");
+    }
+    if (body_size == 0) {
+        return PeerMessage{.id = std::nullopt, .payload = {}};
+    }
+
+    return PeerMessage{
+        .id = static_cast<PeerMessageId>(message[4]),
+        .payload = std::vector<unsigned char>{message.begin() + 5, message.end()},
+    };
+}
+
+PeerConnection::PeerConnection(std::string_view endpoint)
+    : descriptor_{connect_with_retries(endpoint).release()} {}
+
+PeerConnection::~PeerConnection() {
+    if (descriptor_ >= 0) {
+        ::close(descriptor_);
+    }
+}
+
+PeerConnection::PeerConnection(PeerConnection&& other) noexcept
+    : descriptor_{std::exchange(other.descriptor_, -1)} {}
+
+PeerConnection& PeerConnection::operator=(PeerConnection&& other) noexcept {
+    if (this != &other) {
+        if (descriptor_ >= 0) {
+            ::close(descriptor_);
+        }
+        descriptor_ = std::exchange(other.descriptor_, -1);
+    }
+    return *this;
+}
+
+PeerHandshake PeerConnection::exchange_handshake(const PeerHandshake& local_handshake) {
     const PeerHandshakeBytes request = serialize_peer_handshake(local_handshake);
     const Deadline deadline = std::chrono::steady_clock::now() + socket_timeout;
-    send_all(connection.get(), request, deadline);
+    send_all(descriptor_, request, deadline);
 
     PeerHandshakeBytes response{};
-    receive_all(connection.get(), response, deadline);
+    receive_all(descriptor_, response, deadline);
     return parse_peer_handshake(response, local_handshake.info_hash);
+}
+
+void PeerConnection::send_message(const PeerMessage& message) {
+    const std::vector<unsigned char> encoded = serialize_peer_message(message);
+    send_all(descriptor_, encoded, std::chrono::steady_clock::now() + message_timeout);
+}
+
+PeerMessage PeerConnection::receive_message() {
+    const Deadline deadline = std::chrono::steady_clock::now() + message_timeout;
+    std::array<unsigned char, 4> prefix{};
+    receive_all(descriptor_, prefix, deadline);
+
+    const std::uint32_t body_size = read_uint32(prefix, 0);
+    if (body_size > maximum_peer_message_size) {
+        throw std::runtime_error("Peer message exceeds the maximum supported size");
+    }
+
+    std::vector<unsigned char> encoded(prefix.begin(), prefix.end());
+    encoded.resize(4 + body_size);
+    if (body_size != 0) {
+        receive_all(descriptor_, std::span<unsigned char>{encoded}.subspan(4), deadline);
+    }
+    return parse_peer_message(encoded);
+}
+
+PeerHandshake exchange_peer_handshake(std::string_view endpoint,
+                                      const PeerHandshake& local_handshake) {
+    PeerConnection connection{endpoint};
+    return connection.exchange_handshake(local_handshake);
 }
 
 } // namespace torrentforge

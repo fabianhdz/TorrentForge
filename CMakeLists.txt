@@ -26,6 +26,7 @@ endif()
 add_library(torrentforge_core STATIC
     src/application.cpp
     src/bencode.cpp
+    src/download.cpp
     src/hash.cpp
     src/peer.cpp
     src/peer_id.cpp

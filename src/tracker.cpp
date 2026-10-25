@@ -170,7 +170,8 @@ std::string build_tracker_url(const TorrentMetadata& metadata, const PeerId& pee
 }
 
 std::vector<PeerEndpoint> parse_tracker_response(const std::string& encoded_response) {
-    const nlohmann::json response = decode_bencoded_value(encoded_response);
+    const nlohmann::json response = decode_bencoded_value(
+        encoded_response, BencodeDecodeOptions{.require_sorted_dictionary_keys = false});
     if (!response.is_object()) {
         throw std::runtime_error("Tracker response must be a dictionary");
     }
