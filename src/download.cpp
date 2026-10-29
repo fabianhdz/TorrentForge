@@ -28,6 +28,11 @@ constexpr std::size_t block_size = 16 * 1024;
 constexpr std::size_t maximum_pending_requests = 5;
 constexpr std::size_t maximum_ignored_messages = 4096;
 
+class OutputFileError : public std::runtime_error {
+  public:
+    using std::runtime_error::runtime_error;
+};
+
 void append_uint32(std::vector<unsigned char>& bytes, std::uint32_t value) {
     bytes.push_back(static_cast<unsigned char>(value >> 24));
     bytes.push_back(static_cast<unsigned char>(value >> 16));
@@ -166,11 +171,8 @@ std::vector<unsigned char> receive_piece(PeerConnection& connection,
     return piece;
 }
 
-std::vector<unsigned char> download_from_peer(const TorrentMetadata& metadata,
-                                              std::size_t piece_index,
-                                              std::size_t piece_size,
-                                              const PeerId& peer_id,
-                                              const PeerEndpoint& endpoint) {
+PeerConnection connect_to_peer(const TorrentMetadata& metadata, const PeerId& peer_id,
+                               const PeerEndpoint& endpoint) {
     PeerConnection connection{to_string(endpoint)};
     const PeerHandshake local_handshake{
         .reserved = {},
@@ -179,7 +181,13 @@ std::vector<unsigned char> download_from_peer(const TorrentMetadata& metadata,
     };
     static_cast<void>(connection.exchange_handshake(local_handshake));
     wait_until_ready(connection);
+    return connection;
+}
 
+std::vector<unsigned char> download_verified_piece(PeerConnection& connection,
+                                                   const TorrentMetadata& metadata,
+                                                   std::size_t piece_index) {
+    const std::size_t piece_size = torrent_piece_size(metadata, piece_index);
     std::vector<unsigned char> piece =
         receive_piece(connection, static_cast<std::uint32_t>(piece_index), piece_size);
     const std::string_view piece_bytes{reinterpret_cast<const char*>(piece.data()), piece.size()};
@@ -187,6 +195,14 @@ std::vector<unsigned char> download_from_peer(const TorrentMetadata& metadata,
         throw std::runtime_error("Downloaded piece failed SHA-1 verification");
     }
     return piece;
+}
+
+std::vector<unsigned char> download_from_peer(const TorrentMetadata& metadata,
+                                              std::size_t piece_index,
+                                              const PeerId& peer_id,
+                                              const PeerEndpoint& endpoint) {
+    PeerConnection connection = connect_to_peer(metadata, peer_id, endpoint);
+    return download_verified_piece(connection, metadata, piece_index);
 }
 
 struct TemporaryOutput {
@@ -200,6 +216,77 @@ struct TemporaryOutput {
         }
     }
 };
+
+TemporaryOutput make_temporary_output(const std::filesystem::path& output_path) {
+    const auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
+    return TemporaryOutput{
+        .path = output_path.string() + ".torrentforge-part-" + std::to_string(suffix),
+    };
+}
+
+void publish_output(TemporaryOutput& temporary,
+                    const std::filesystem::path& output_path) {
+    std::error_code rename_error;
+    std::filesystem::rename(temporary.path, output_path, rename_error);
+    if (rename_error) {
+        throw OutputFileError("Unable to publish output file: " + rename_error.message());
+    }
+    temporary.published = true;
+}
+
+void close_output(std::ofstream& output, const std::filesystem::path& output_path) {
+    output.close();
+    if (!output) {
+        throw OutputFileError("Unable to write output file: " + output_path.string());
+    }
+}
+
+void write_bytes(std::ofstream& output, std::span<const unsigned char> contents,
+                 const std::filesystem::path& output_path) {
+    if (contents.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
+        throw OutputFileError("Output is too large to write");
+    }
+    if (!contents.empty()) {
+        output.write(reinterpret_cast<const char*>(contents.data()),
+                     static_cast<std::streamsize>(contents.size()));
+    }
+    if (!output) {
+        throw OutputFileError("Unable to write output file: " + output_path.string());
+    }
+}
+
+void validate_torrent_layout(const TorrentMetadata& metadata) {
+    if (metadata.piece_length <= 0 || metadata.length < 0) {
+        throw std::runtime_error("Torrent contains invalid piece sizing metadata");
+    }
+
+    const std::uint64_t file_length = static_cast<std::uint64_t>(metadata.length);
+    const std::uint64_t piece_length = static_cast<std::uint64_t>(metadata.piece_length);
+    const std::uint64_t expected_piece_count =
+        file_length == 0 ? 0 : 1 + (file_length - 1) / piece_length;
+    if (expected_piece_count != metadata.piece_hashes.size()) {
+        throw std::runtime_error(
+            "Torrent piece hash count does not match the file length");
+    }
+}
+
+void download_file_from_peer(const TorrentMetadata& metadata, const PeerId& peer_id,
+                             const PeerEndpoint& endpoint,
+                             const std::filesystem::path& temporary_path) {
+    std::ofstream output{temporary_path, std::ios::binary | std::ios::trunc};
+    if (!output) {
+        throw OutputFileError("Unable to open output file: " + temporary_path.string());
+    }
+
+    PeerConnection connection = connect_to_peer(metadata, peer_id, endpoint);
+    for (std::size_t piece_index = 0; piece_index < metadata.piece_hashes.size();
+         ++piece_index) {
+        const std::vector<unsigned char> piece =
+            download_verified_piece(connection, metadata, piece_index);
+        write_bytes(output, piece, temporary_path);
+    }
+    close_output(output, temporary_path);
+}
 
 } // namespace
 
@@ -233,7 +320,7 @@ std::size_t torrent_piece_size(const TorrentMetadata& metadata, std::size_t piec
 std::vector<unsigned char> download_piece(const TorrentMetadata& metadata,
                                           std::size_t piece_index,
                                           const PeerId& peer_id) {
-    const std::size_t piece_size = torrent_piece_size(metadata, piece_index);
+    static_cast<void>(torrent_piece_size(metadata, piece_index));
     const std::vector<PeerEndpoint> peers = discover_peers(metadata, peer_id);
     if (peers.empty()) {
         throw std::runtime_error("Tracker returned no peers");
@@ -242,7 +329,7 @@ std::vector<unsigned char> download_piece(const TorrentMetadata& metadata,
     std::exception_ptr last_error;
     for (const PeerEndpoint& peer : peers) {
         try {
-            return download_from_peer(metadata, piece_index, piece_size, peer_id, peer);
+            return download_from_peer(metadata, piece_index, peer_id, peer);
         } catch (...) {
             last_error = std::current_exception();
         }
@@ -254,40 +341,64 @@ std::vector<unsigned char> download_piece(const TorrentMetadata& metadata,
     throw std::runtime_error("Unable to download piece from any peer");
 }
 
+void download_file(const TorrentMetadata& metadata, const PeerId& peer_id,
+                   const std::filesystem::path& output_path) {
+    validate_torrent_layout(metadata);
+    TemporaryOutput temporary = make_temporary_output(output_path);
+
+    if (metadata.piece_hashes.empty()) {
+        std::ofstream output{temporary.path, std::ios::binary | std::ios::trunc};
+        if (!output) {
+            throw OutputFileError("Unable to open output file: " + output_path.string());
+        }
+        close_output(output, output_path);
+        publish_output(temporary, output_path);
+        return;
+    }
+
+    const std::vector<PeerEndpoint> peers = discover_peers(metadata, peer_id);
+    if (peers.empty()) {
+        throw std::runtime_error("Tracker returned no peers");
+    }
+
+    std::exception_ptr last_error;
+    bool downloaded = false;
+    for (const PeerEndpoint& peer : peers) {
+        try {
+            download_file_from_peer(metadata, peer_id, peer, temporary.path);
+            downloaded = true;
+            break;
+        } catch (const OutputFileError&) {
+            throw;
+        } catch (...) {
+            last_error = std::current_exception();
+        }
+    }
+
+    if (!downloaded) {
+        if (last_error) {
+            std::rethrow_exception(last_error);
+        }
+        throw std::runtime_error("Unable to download file from any peer");
+    }
+
+    publish_output(temporary, output_path);
+}
+
 void write_piece_file(const std::filesystem::path& output_path,
                       std::span<const unsigned char> contents) {
-    if (contents.size() > static_cast<std::size_t>(std::numeric_limits<std::streamsize>::max())) {
-        throw std::runtime_error("Piece output is too large to write");
-    }
-    const auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
-    TemporaryOutput temporary{
-        .path = output_path.string() + ".torrentforge-part-" + std::to_string(suffix),
-    };
+    TemporaryOutput temporary = make_temporary_output(output_path);
 
     {
         std::ofstream output{temporary.path, std::ios::binary | std::ios::trunc};
         if (!output) {
-            throw std::runtime_error("Unable to open piece output file: " +
-                                     output_path.string());
+            throw OutputFileError("Unable to open output file: " + output_path.string());
         }
-        if (!contents.empty()) {
-            output.write(reinterpret_cast<const char*>(contents.data()),
-                         static_cast<std::streamsize>(contents.size()));
-        }
-        output.close();
-        if (!output) {
-            throw std::runtime_error("Unable to write piece output file: " +
-                                     output_path.string());
-        }
+        write_bytes(output, contents, output_path);
+        close_output(output, output_path);
     }
 
-    std::error_code rename_error;
-    std::filesystem::rename(temporary.path, output_path, rename_error);
-    if (rename_error) {
-        throw std::runtime_error("Unable to publish piece output file: " +
-                                 rename_error.message());
-    }
-    temporary.published = true;
+    publish_output(temporary, output_path);
 }
 
 } // namespace torrentforge

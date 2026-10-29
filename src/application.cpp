@@ -27,6 +27,7 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
                   "       torrentforge peers <torrent_file>\n"
                   "       torrentforge handshake <torrent_file> <peer>\n"
                   "       torrentforge download_piece -o <output> <torrent_file> <index>\n"
+                  "       torrentforge download -o <output> <torrent_file>\n"
                   "Reads torrent metadata and communicates with trackers and peers.\n";
         return 0;
     }
@@ -131,6 +132,24 @@ int run(std::span<const std::string_view> arguments, std::ostream& output,
             const auto piece = download_piece(metadata, piece_index, generate_peer_id());
             write_piece_file(std::filesystem::path{std::string{arguments[2]}}, piece);
             output << "Piece " << piece_index << " downloaded to " << arguments[2] << ".\n";
+            return 0;
+        } catch (const std::exception& error) {
+            errors << "TorrentForge: " << error.what() << '\n';
+            return 1;
+        }
+    }
+
+    if (arguments.front() == "download") {
+        if (arguments.size() != 4 || arguments[1] != "-o") {
+            errors << "Usage: torrentforge download -o <output> <torrent_file>\n";
+            return 1;
+        }
+        try {
+            const auto metadata =
+                load_torrent_metadata(std::filesystem::path{std::string{arguments[3]}});
+            download_file(metadata, generate_peer_id(),
+                          std::filesystem::path{std::string{arguments[2]}});
+            output << "File downloaded to " << arguments[2] << ".\n";
             return 0;
         } catch (const std::exception& error) {
             errors << "TorrentForge: " << error.what() << '\n';
