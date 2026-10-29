@@ -71,5 +71,37 @@ int main() {
                      }),
           "The piece file should preserve every binary byte");
 
+    TemporaryFile empty_output{
+        std::filesystem::temp_directory_path() /
+        ("torrentforge-empty-" + std::to_string(suffix) + ".bin")};
+    {
+        std::ofstream previous_contents{empty_output.path, std::ios::binary};
+        previous_contents << "old contents";
+    }
+    const torrentforge::TorrentMetadata empty_metadata{
+        .tracker_url = "http://tracker.example/announce",
+        .length = 0,
+        .info_hash = {},
+        .piece_length = 16384,
+        .piece_hashes = {},
+    };
+    torrentforge::download_file(empty_metadata, torrentforge::PeerId{}, empty_output.path);
+    check(std::filesystem::file_size(empty_output.path) == 0,
+          "Downloading an empty torrent should atomically replace the output with an empty file");
+
+    torrentforge::TorrentMetadata invalid_metadata = metadata;
+    invalid_metadata.piece_hashes.pop_back();
+    TemporaryFile invalid_output{
+        std::filesystem::temp_directory_path() /
+        ("torrentforge-invalid-" + std::to_string(suffix) + ".bin")};
+    try {
+        torrentforge::download_file(invalid_metadata, torrentforge::PeerId{},
+                                    invalid_output.path);
+        check(false, "A mismatched piece count should be rejected before downloading");
+    } catch (const std::runtime_error&) {
+    }
+    check(!std::filesystem::exists(invalid_output.path),
+          "Invalid metadata should not create an output file");
+
     return failures == 0 ? 0 : 1;
 }

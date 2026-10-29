@@ -151,5 +151,14 @@ int main() {
     check(errors.str().find("Usage:") != std::string::npos,
           "Missing download arguments should explain usage");
 
+    output.str("");
+    errors.str("");
+    const std::array missing_file_download_arguments{std::string_view{"download"}};
+    check(torrentforge::run(missing_file_download_arguments, output, errors) == 1,
+          "Download requires output and torrent arguments");
+    check(output.str().empty(), "Missing file download arguments should not produce output");
+    check(errors.str().find("Usage:") != std::string::npos,
+          "Missing file download arguments should explain usage");
+
     return failures == 0 ? 0 : 1;
 }
